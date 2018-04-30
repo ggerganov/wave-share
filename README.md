@@ -4,8 +4,7 @@ A proof-of-concept for WebRTC signaling using sound. Works with all devices that
 browser.
 
 Nearby devices negotiate the WebRTC connection by exchanging the necessary Session Description Protocol (SDP) data via
-a sequence of audio tones. Upon successful negotiation, a local WebRTC connection is established between the browsers allowing
-data to be exchanged via LAN.
+a sequence of audio tones. Upon successful negotiation, a local WebRTC connection is established between the browsers allowing data to be exchanged via LAN.
 
 See it in action:
 
@@ -15,20 +14,33 @@ Try it yourself: [ggerganov.github.io/wave-share.html](https://ggerganov.github.
 
 ## How it works
 
-The [WebRTC](https://en.wikipedia.org/wiki/WebRTC) technology allows two browsers running on different devices to connect with each other and exchange data. There is no need to install plugins or download applications. To initiate the connection, the peers need to exchange contact information (ip address, network ports, session id, etc.). This process is called "signaling". The WebRTC specification does not define any standard about signaling. The contact exchange can be achieved by any protocol or technology.
+The [WebRTC](https://en.wikipedia.org/wiki/WebRTC) technology allows two browsers running on different devices to connect with each other and exchange data. There is no need to install plugins or download applications. To initiate the connection, the peers need to exchange contact information (ip address, network ports, session id, etc.). This process is called "signaling". The WebRTC specification does not define any standard for signaling - the contact exchange can be achieved by any protocol or technology.
 
 In this project the signaling is performed via sound. The signaling sequence looks like this:
 
-  - Peer A broadcasts an offer for a WebRTC connection by encoding the session data into the output audio
+  - Peer A broadcasts an offer for a WebRTC connection by encoding the session data into audio tones
   - Nearby peer(s) capture the sound emitted by peer A and decode the WebRTC session data
   - Peer B, who wants to establish connection with peer A, responds with an audio answer. The answer has peer B's contact information encoded in it. Additionally, peer B starts trying to connect to peer A
   - Peer A receives the answer from peer B, decodes the transmitted contact data and allows peer B to connect
   - Connection is established
   
+<p align="center"><img src="media/wave-share-scheme2.png"></p>
+  
 In contrast to most WebRTC applications, the described signaling sequence does not involve a signaling server. Therefore, an application using sound signaling can be served by a static web page. The only requirement is to have control over the audio output/capture devices.
 
 An obvious limitation (feature) of the current approach is that only nearby devices (e.g. within the same room) can establish connection with each other.
 
+## Sound Tx/Rx
+
+Todo
+
 ## Build
 
+Todo
+
 ## Known problems / stuff to improve
+
+  - Does not work with Internet Explorer and Safari
+  - Ultrasonic sound transmission does not work on most devices. Probably hardware limitations?
+  - In presence of multiple local networks, cannot currently select which one to use. Always the first one is used
+  - There is occasionally sound cracking during transmission. Need to optimize Tx code
