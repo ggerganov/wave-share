@@ -34,21 +34,21 @@ An obvious limitation (feature) of the current approach is that only nearby devi
 
 The data communicated through sound contains the contact information required to initialize the WebRTC connection. This data is stored in the [Session Description Protocol (SDP)](https://en.wikipedia.org/wiki/Session_Description_Protocol) format. Since data-over-sound has significant limitations in terms of bandwidth and robustness it is desirable to transmit as few data as possible. Therefore, the SDP is stripped from all irrelevant information and only the essential data needed to establish the connection is transmitted. Currently, the sound packet containing the minimum required SDP data has the following format:
 
-| Size | Description |
-| ---- | ----------- |
-| 1    | Type of the SDP - Offer or Answer |
-| 1    | Packet size in bytes (not including ECC bytes) |
-| 4    | IP address of the transmitting peer |
-| 2    | Network port that will be used for the communication |
-| 32   | SHA-256 fingerprint of the session data |
-| 40   | ICE Credentials - 16 bytes username + 24 bytes password |
-| 32   | ECC correction bytes used to correct errors during Tx |
+| Size, [B] | Description |
+| --------- | ----------- |
+| 1         | Type of the SDP - Offer or Answer |
+| 1         | Packet size in bytes (not including ECC bytes) |
+| 4         | IP address of the transmitting peer |
+| 2         | Network port that will be used for the communication |
+| 32        | SHA-256 fingerprint of the session data |
+| 40        | ICE Credentials - 16 bytes username + 24 bytes password |
+| 32        | ECC correction bytes used to correct errors during Tx |
 
 The total size of the audio packet is 112 bytes. With the current audio encoding algorithm, the SDP packet can be transmitted in 5-10 seconds (depending on the Tx protocol used). Using slower protocols provides more reliable transmission in noisy environments or if the communicating devices are far from each other.
 
 ### Data-to-sound encoding
 
-The current approach uses a multi-frequency [Frequency-Shift Keying (FSK)](https://en.wikipedia.org/wiki/Frequency-shift_keying) modulation scheme. The data to be transmitted is first split into 4-bit chunks. At each moment of time, 3 bytes are transmitted using 6 tones - one tone for each 4-bit chunk. The 6 tones are emitted in a 4.5kHz range, which is divided in 96 equally-spaced frequencies:
+The current approach uses a multi-frequency [Frequency-Shift Keying (FSK)](https://en.wikipedia.org/wiki/Frequency-shift_keying) modulation scheme. The data to be transmitted is first split into 4-bit chunks. At each moment of time, 3 bytes are transmitted using 6 tones - one tone for each 4-bit chunk. The 6 tones are emitted in a 4.5kHz range divided in 96 equally-spaced frequencies:
 
 | Freq, [Hz]   | Value, [bits]   | Freq, [Hz]   | Value, [bits]   | ... | Freq, [Hz]   | Value, [bits]   |
 | ------------ | --------------- | ------------ | --------------- | --- | ------------ | --------------- |
@@ -70,5 +70,6 @@ To build this project you need Emscripten compiler. Additionally, you need [FFTW
   - Does not work with Internet Explorer and Safari
   - Ultrasonic sound transmission does not work on most devices. Probably hardware limitations?
   - In presence of multiple local networks, cannot currently select which one to use. Always the first one is used
-  - There is occasionally sound cracking during transmission. Need to optimize Tx code
-  - The size of the emscripten generated .js is too big (~4MB)
+  - There is occasionally sound cracking during transmission. Optimize the Tx code
+  - The size of the emscripten generated .js is too big (~4MB). Rewrite in pure JS
+  - On mobile, using Firefox, the page can remain running in the background even after closing the tab
