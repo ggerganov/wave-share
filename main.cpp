@@ -31,6 +31,9 @@
 #undef main
 #endif
 
+static char *g_captureDeviceName = nullptr;
+
+static bool g_isInitialized = false;
 static int g_totalBytesCaptured = 0;
 
 static SDL_AudioDeviceID devid_in = 0;
@@ -604,98 +607,8 @@ struct DataRxTx {
     std::string textToSend;
 };
 
-// JS interface
-extern "C" {
-    int setText(int textLength, const char * text) {
-        g_data->init(textLength, text);
-        return 0;
-    }
-
-    int getText(char * text) {
-        std::copy(g_data->rxData.begin(), g_data->rxData.end(), text);
-        return 0;
-    }
-
-    int getSampleRate() { return g_data->sampleRate; }
-    float getAverageRxTime_ms() { return g_data->averageRxTime_ms; }
-    int getFramesToRecord() { return g_data->framesToRecord; }
-    int getFramesLeftToRecord() { return g_data->framesLeftToRecord; }
-    int getFramesToAnalyze() { return g_data->framesToAnalyze; }
-    int getFramesLeftToAnalyze() { return g_data->framesLeftToAnalyze; }
-    int hasDeviceOutput() { return devid_out; }
-    int hasDeviceCapture() { return (g_totalBytesCaptured > 0) ? devid_in : 0; }
-
-    void setParameters(
-        int paramFreqDelta,
-        int paramFreqStart,
-        int paramFramesPerTx,
-        int paramBytesPerTx,
-        int /*paramECCBytesPerTx*/,
-        int paramVolume) {
-        if (g_data == nullptr) return;
-
-        g_data->paramFreqDelta = paramFreqDelta;
-        g_data->paramFreqStart = paramFreqStart;
-        g_data->paramFramesPerTx = paramFramesPerTx;
-        g_data->paramBytesPerTx = paramBytesPerTx;
-        g_data->paramVolume = paramVolume;
-
-        g_data->needUpdate = true;
-    }
-}
-
-// main loop
-void update() {
-    SDL_Event e;
-    SDL_bool shouldTerminate = SDL_FALSE;
-    while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) {
-            shouldTerminate = SDL_TRUE;
-        }
-    }
-
-    if (g_data->hasData == false) {
-        SDL_PauseAudioDevice(devid_out, SDL_FALSE);
-
-        static auto tLastNoData = std::chrono::high_resolution_clock::now();
-        auto tNow = std::chrono::high_resolution_clock::now();
-
-        if (SDL_GetQueuedAudioSize(devid_out) == 0) {
-            SDL_PauseAudioDevice(devid_in, SDL_FALSE);
-            if (::getTime_ms(tLastNoData, tNow) > 500.0f) {
-                g_data->receive();
-            } else {
-                SDL_ClearQueuedAudio(devid_in);
-            }
-        } else {
-            tLastNoData = tNow;
-            //SDL_ClearQueuedAudio(devid_in);
-            //SDL_Delay(10);
-        }
-    } else {
-        SDL_PauseAudioDevice(devid_out, SDL_TRUE);
-        SDL_PauseAudioDevice(devid_in, SDL_TRUE);
-
-        g_data->send();
-    }
-
-    if (shouldTerminate) {
-        SDL_PauseAudioDevice(devid_in, 1);
-        SDL_CloseAudioDevice(devid_in);
-        SDL_PauseAudioDevice(devid_out, 1);
-        SDL_CloseAudioDevice(devid_out);
-        SDL_CloseAudio();
-        SDL_Quit();
-        #ifdef __EMSCRIPTEN__
-        emscripten_cancel_main_loop();
-        #endif
-    }
-}
-
-int main(int /*argc*/, char** argv) {
-    printf("Build time: %s\n", BUILD_TIMESTAMP);
-
-    const char *captureDeviceName = argv[1];
+int init() {
+    if (g_isInitialized) return 0;
 
     SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
 
@@ -760,11 +673,11 @@ int main(int /*argc*/, char** argv) {
     captureSpec.samples = 1024;
 
     SDL_Log("Opening capture device %s%s%s...\n",
-            captureDeviceName ? "'" : "",
-            captureDeviceName ? captureDeviceName : "[[default]]",
-            captureDeviceName ? "'" : "");
+            g_captureDeviceName ? "'" : "",
+            g_captureDeviceName ? g_captureDeviceName : "[[default]]",
+            g_captureDeviceName ? "'" : "");
 
-    devid_in = SDL_OpenAudioDevice(argv[1], SDL_TRUE, &captureSpec, &captureSpec, 0);
+    devid_in = SDL_OpenAudioDevice(g_captureDeviceName, SDL_TRUE, &captureSpec, &captureSpec, 0);
     if (!devid_in) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -794,6 +707,107 @@ int main(int /*argc*/, char** argv) {
     //}
 
     g_data = new DataRxTx(obtainedSpec.freq, ::kBaseSampleRate, captureSpec.samples, sampleSizeBytes, "");
+
+    g_isInitialized = true;
+    return 0;
+}
+
+// JS interface
+extern "C" {
+    int setText(int textLength, const char * text) {
+        g_data->init(textLength, text);
+        return 0;
+    }
+
+    int getText(char * text) {
+        std::copy(g_data->rxData.begin(), g_data->rxData.end(), text);
+        return 0;
+    }
+
+    int getSampleRate() { return g_data->sampleRate; }
+    float getAverageRxTime_ms() { return g_data->averageRxTime_ms; }
+    int getFramesToRecord() { return g_data->framesToRecord; }
+    int getFramesLeftToRecord() { return g_data->framesLeftToRecord; }
+    int getFramesToAnalyze() { return g_data->framesToAnalyze; }
+    int getFramesLeftToAnalyze() { return g_data->framesLeftToAnalyze; }
+    int hasDeviceOutput() { return devid_out; }
+    int hasDeviceCapture() { return (g_totalBytesCaptured > 0) ? devid_in : 0; }
+    int doInit() { return init(); }
+
+    void setParameters(
+        int paramFreqDelta,
+        int paramFreqStart,
+        int paramFramesPerTx,
+        int paramBytesPerTx,
+        int /*paramECCBytesPerTx*/,
+        int paramVolume) {
+        if (g_data == nullptr) return;
+
+        g_data->paramFreqDelta = paramFreqDelta;
+        g_data->paramFreqStart = paramFreqStart;
+        g_data->paramFramesPerTx = paramFramesPerTx;
+        g_data->paramBytesPerTx = paramBytesPerTx;
+        g_data->paramVolume = paramVolume;
+
+        g_data->needUpdate = true;
+    }
+}
+
+// main loop
+void update() {
+    if (g_isInitialized == false) return;
+
+    SDL_Event e;
+    SDL_bool shouldTerminate = SDL_FALSE;
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) {
+            shouldTerminate = SDL_TRUE;
+        }
+    }
+
+    if (g_data->hasData == false) {
+        SDL_PauseAudioDevice(devid_out, SDL_FALSE);
+
+        static auto tLastNoData = std::chrono::high_resolution_clock::now();
+        auto tNow = std::chrono::high_resolution_clock::now();
+
+        if (SDL_GetQueuedAudioSize(devid_out) == 0) {
+            SDL_PauseAudioDevice(devid_in, SDL_FALSE);
+            if (::getTime_ms(tLastNoData, tNow) > 500.0f) {
+                g_data->receive();
+            } else {
+                SDL_ClearQueuedAudio(devid_in);
+            }
+        } else {
+            tLastNoData = tNow;
+            //SDL_ClearQueuedAudio(devid_in);
+            //SDL_Delay(10);
+        }
+    } else {
+        SDL_PauseAudioDevice(devid_out, SDL_TRUE);
+        SDL_PauseAudioDevice(devid_in, SDL_TRUE);
+
+        g_data->send();
+    }
+
+    if (shouldTerminate) {
+        SDL_PauseAudioDevice(devid_in, 1);
+        SDL_CloseAudioDevice(devid_in);
+        SDL_PauseAudioDevice(devid_out, 1);
+        SDL_CloseAudioDevice(devid_out);
+        SDL_CloseAudio();
+        SDL_Quit();
+        #ifdef __EMSCRIPTEN__
+        emscripten_cancel_main_loop();
+        #endif
+    }
+}
+
+int main(int /*argc*/, char** argv) {
+    printf("Build time: %s\n", BUILD_TIMESTAMP);
+    printf("Press the Init button to start\n");
+
+    g_captureDeviceName = argv[1];
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(update, 60, 1);
