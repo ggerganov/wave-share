@@ -31,6 +31,8 @@
 #undef main
 #endif
 
+static int g_totalBytesCaptured = 0;
+
 static SDL_AudioDeviceID devid_in = 0;
 static SDL_AudioDeviceID devid_out = 0;
 
@@ -312,6 +314,8 @@ struct DataRxTx {
             // read capture data
             int nBytesRecorded = SDL_DequeueAudio(devid_in, sampleAmplitude.data(), samplesPerFrame*sampleSizeBytes);
             if (nBytesRecorded != 0) {
+                g_totalBytesCaptured += nBytesRecorded;
+
                 {
                     sampleAmplitudeHistory[historyId] = sampleAmplitude;
 
@@ -612,29 +616,14 @@ extern "C" {
         return 0;
     }
 
-    int getSampleRate() {
-        return g_data->sampleRate;
-    }
-
-    float getAverageRxTime_ms() {
-        return g_data->averageRxTime_ms;
-    }
-
-    int getFramesToRecord() {
-        return g_data->framesToRecord;
-    }
-
-    int getFramesLeftToRecord() {
-        return g_data->framesLeftToRecord;
-    }
-
-    int getFramesToAnalyze() {
-        return g_data->framesToAnalyze;
-    }
-
-    int getFramesLeftToAnalyze() {
-        return g_data->framesLeftToAnalyze;
-    }
+    int getSampleRate() { return g_data->sampleRate; }
+    float getAverageRxTime_ms() { return g_data->averageRxTime_ms; }
+    int getFramesToRecord() { return g_data->framesToRecord; }
+    int getFramesLeftToRecord() { return g_data->framesLeftToRecord; }
+    int getFramesToAnalyze() { return g_data->framesToAnalyze; }
+    int getFramesLeftToAnalyze() { return g_data->framesLeftToAnalyze; }
+    int hasDeviceOutput() { return devid_out; }
+    int hasDeviceCapture() { return (g_totalBytesCaptured > 0) ? devid_in : 0; }
 
     void setParameters(
         int paramFreqDelta,
@@ -691,7 +680,6 @@ void update() {
     }
 
     if (shouldTerminate) {
-        SDL_Log("Shutting down.\n");
         SDL_PauseAudioDevice(devid_in, 1);
         SDL_CloseAudioDevice(devid_in);
         SDL_PauseAudioDevice(devid_out, 1);
@@ -817,5 +805,13 @@ int main(int /*argc*/, char** argv) {
 #endif
 
     delete g_data;
+
+    SDL_PauseAudioDevice(devid_in, 1);
+    SDL_CloseAudioDevice(devid_in);
+    SDL_PauseAudioDevice(devid_out, 1);
+    SDL_CloseAudioDevice(devid_out);
+    SDL_CloseAudio();
+    SDL_Quit();
+
     return 0;
 }
