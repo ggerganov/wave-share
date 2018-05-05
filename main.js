@@ -538,6 +538,8 @@ function checkRxForPeerData() {
 
         lastReceiverAnswerSDP = '{"type":"answer","sdp":'+JSON.stringify(writeSDP(res))+'}';
         playSound("/media/open-ended");
+
+        peerInfo.innerHTML= "Trying to connect with " + vals[0] + " ...";
         senderSend();
 
         return;

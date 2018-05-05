@@ -316,8 +316,6 @@ struct DataRxTx {
             // read capture data
             int nBytesRecorded = SDL_DequeueAudio(devid_in, sampleAmplitude.data(), samplesPerFrame*sampleSizeBytes);
             if (nBytesRecorded != 0) {
-                g_totalBytesCaptured += nBytesRecorded;
-
                 {
                     float fsum = 0.0f;
                     sampleAmplitudeHistory[historyId] = sampleAmplitude;
@@ -353,6 +351,8 @@ struct DataRxTx {
 
                         if (fsum == 0.0f) {
                             g_totalBytesCaptured = 0;
+                        } else {
+                            g_totalBytesCaptured += nBytesRecorded;
                         }
                     }
 
@@ -732,7 +732,7 @@ extern "C" {
     int getFramesToAnalyze() { return g_data->framesToAnalyze; }
     int getFramesLeftToAnalyze() { return g_data->framesLeftToAnalyze; }
     int hasDeviceOutput() { return devid_out; }
-    int hasDeviceCapture() { return (g_totalBytesCaptured > 0) ? devid_in : 0; }
+    int hasDeviceCapture() { return (g_totalBytesCaptured > 32*1024) ? devid_in : 0; }
     int doInit() { return init(); }
 
     void setParameters(
