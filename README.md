@@ -67,9 +67,9 @@ To build this project you need Emscripten compiler. Additionally, you need [FFTW
 
 ## Known problems / stuff to improve
 
-  - Does not work with Internet Explorer and Safari
+  - Does not work with: IE, IE Edge, Chrome/Firefox on iOS, Safari on macOS (?)
   - Ultrasonic sound transmission does not work on most devices. Probably hardware limitations?
   - In presence of multiple local networks, cannot currently select which one to use. Always the first one is used
-  - There is occasionally sound cracking during transmission. Optimize the Tx code
-  - The size of the emscripten generated .js is too big (~4MB). Rewrite in pure JS
+  - There is occasionally sound cracking during transmission. Need to optimize the Tx code
+  - The size of the emscripten generated .js is too big (~4MB). Rewrite in pure JS?
   - On mobile, using Firefox, the page can remain running in the background even after closing the tab
