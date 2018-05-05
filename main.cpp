@@ -649,22 +649,22 @@ int init() {
     //devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
     devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, 0);
     if (!devid_out) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
-        SDL_Quit();
-        exit(1);
-    }
+        printf("Couldn't open an audio device for playback: %s!\n", SDL_GetError());
+        devid_out = 0;
+    } else {
 
-    printf("Obtained spec for output device (SDL Id = %d):\n", devid_out);
-    printf("    - Sample rate:       %d (required: %d)\n", obtainedSpec.freq, desiredSpec.freq);
-    printf("    - Format:            %d (required: %d)\n", obtainedSpec.format, desiredSpec.format);
-    printf("    - Channels:          %d (required: %d)\n", obtainedSpec.channels, desiredSpec.channels);
-    printf("    - Samples per frame: %d (required: %d)\n", obtainedSpec.samples, desiredSpec.samples);
+        printf("Obtained spec for output device (SDL Id = %d):\n", devid_out);
+        printf("    - Sample rate:       %d (required: %d)\n", obtainedSpec.freq, desiredSpec.freq);
+        printf("    - Format:            %d (required: %d)\n", obtainedSpec.format, desiredSpec.format);
+        printf("    - Channels:          %d (required: %d)\n", obtainedSpec.channels, desiredSpec.channels);
+        printf("    - Samples per frame: %d (required: %d)\n", obtainedSpec.samples, desiredSpec.samples);
 
-    if (obtainedSpec.format != desiredSpec.format ||
-        obtainedSpec.channels != desiredSpec.channels ||
-        obtainedSpec.samples != desiredSpec.samples) {
-        SDL_CloseAudio();
-        throw std::runtime_error("Failed to initialize desired SDL_OpenAudio!");
+        if (obtainedSpec.format != desiredSpec.format ||
+            obtainedSpec.channels != desiredSpec.channels ||
+            obtainedSpec.samples != desiredSpec.samples) {
+            SDL_CloseAudio();
+            throw std::runtime_error("Failed to initialize desired SDL_OpenAudio!");
+        }
     }
 
     SDL_AudioSpec captureSpec;
@@ -673,23 +673,23 @@ int init() {
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.samples = 1024;
 
-    SDL_Log("Opening capture device %s%s%s...\n",
+    printf("Opening capture device %s%s%s...\n",
             g_captureDeviceName ? "'" : "",
             g_captureDeviceName ? g_captureDeviceName : "[[default]]",
             g_captureDeviceName ? "'" : "");
 
     devid_in = SDL_OpenAudioDevice(g_captureDeviceName, SDL_TRUE, &captureSpec, &captureSpec, 0);
     if (!devid_in) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
-        SDL_Quit();
-        exit(1);
-    }
+        printf("Couldn't open an audio device for capture: %s!\n", SDL_GetError());
+        devid_in = 0;
+    } else {
 
-    printf("Obtained spec for input device (SDL Id = %d):\n", devid_out);
-    printf("    - Sample rate:       %d\n", captureSpec.freq);
-    printf("    - Format:            %d (required: %d)\n", captureSpec.format, desiredSpec.format);
-    printf("    - Channels:          %d (required: %d)\n", captureSpec.channels, desiredSpec.channels);
-    printf("    - Samples per frame: %d\n", captureSpec.samples);
+        printf("Obtained spec for input device (SDL Id = %d):\n", devid_out);
+        printf("    - Sample rate:       %d\n", captureSpec.freq);
+        printf("    - Format:            %d (required: %d)\n", captureSpec.format, desiredSpec.format);
+        printf("    - Channels:          %d (required: %d)\n", captureSpec.channels, desiredSpec.channels);
+        printf("    - Samples per frame: %d\n", captureSpec.samples);
+    }
 
     int sampleSizeBytes = 4;
     //switch (obtainedSpec.format) {
