@@ -317,7 +317,6 @@ struct DataRxTx {
             int nBytesRecorded = SDL_DequeueAudio(devid_in, sampleAmplitude.data(), samplesPerFrame*sampleSizeBytes);
             if (nBytesRecorded != 0) {
                 {
-                    float fsum = 0.0f;
                     sampleAmplitudeHistory[historyId] = sampleAmplitude;
 
                     if (++historyId >= ::kMaxSpectrumHistory) {
@@ -341,15 +340,16 @@ struct DataRxTx {
 
                         fftwf_execute(fftPlan);
 
+                        double fsum = 0.0;
                         for (int i = 0; i < samplesPerFrame; ++i) {
                             sampleSpectrum[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
+                            fsum += sampleSpectrum[i];
                         }
                         for (int i = 1; i < samplesPerFrame/2; ++i) {
                             sampleSpectrum[i] += sampleSpectrum[samplesPerFrame - i];
-                            fsum += sampleSpectrum[i];
                         }
 
-                        if (fsum == 0.0f) {
+                        if (fsum < 1e-10) {
                             g_totalBytesCaptured = 0;
                         } else {
                             g_totalBytesCaptured += nBytesRecorded;
@@ -732,7 +732,7 @@ extern "C" {
     int getFramesToAnalyze() { return g_data->framesToAnalyze; }
     int getFramesLeftToAnalyze() { return g_data->framesLeftToAnalyze; }
     int hasDeviceOutput() { return devid_out; }
-    int hasDeviceCapture() { return (g_totalBytesCaptured > 32*1024) ? devid_in : 0; }
+    int hasDeviceCapture() { return (g_totalBytesCaptured > 0) ? devid_in : 0; }
     int doInit() { return init(); }
 
     void setParameters(
@@ -772,7 +772,7 @@ void update() {
         static auto tLastNoData = std::chrono::high_resolution_clock::now();
         auto tNow = std::chrono::high_resolution_clock::now();
 
-        if (SDL_GetQueuedAudioSize(devid_out) == 0) {
+        if ((int) SDL_GetQueuedAudioSize(devid_out) < g_data->samplesPerFrame*g_data->sampleSizeBytes) {
             SDL_PauseAudioDevice(devid_in, SDL_FALSE);
             if (::getTime_ms(tLastNoData, tNow) > 500.0f) {
                 g_data->receive();
