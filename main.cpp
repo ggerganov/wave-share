@@ -168,7 +168,6 @@ struct DataRxTx {
         sampleAmplitude.fill(0);
 
         sampleSpectrum.fill(0);
-        sampleSpectrumTmp.fill(0);
         for (auto & s : sampleAmplitudeHistory) {
             s.fill(0);
         }
@@ -320,6 +319,7 @@ struct DataRxTx {
                 g_totalBytesCaptured += nBytesRecorded;
 
                 {
+                    float fsum = 0.0f;
                     sampleAmplitudeHistory[historyId] = sampleAmplitude;
 
                     if (++historyId >= ::kMaxSpectrumHistory) {
@@ -344,14 +344,16 @@ struct DataRxTx {
                         fftwf_execute(fftPlan);
 
                         for (int i = 0; i < samplesPerFrame; ++i) {
-                            sampleSpectrumTmp[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
+                            sampleSpectrum[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
                         }
                         for (int i = 1; i < samplesPerFrame/2; ++i) {
-                            sampleSpectrumTmp[i] += sampleSpectrumTmp[samplesPerFrame - i];
-                            sampleSpectrumTmp[samplesPerFrame - i] = 0.0f;
+                            sampleSpectrum[i] += sampleSpectrum[samplesPerFrame - i];
+                            fsum += sampleSpectrum[i];
                         }
 
-                        sampleSpectrum = sampleSpectrumTmp;
+                        if (fsum == 0.0f) {
+                            g_totalBytesCaptured = 0;
+                        }
                     }
 
                     if (framesLeftToRecord > 0) {
@@ -402,11 +404,10 @@ struct DataRxTx {
                             fftwf_execute(fftPlan);
 
                             for (int i = 0; i < samplesPerFrame; ++i) {
-                                sampleSpectrumTmp[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
+                                sampleSpectrum[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
                             }
                             for (int i = 1; i < samplesPerFrame/2; ++i) {
-                                sampleSpectrumTmp[i] += sampleSpectrumTmp[samplesPerFrame - i];
-                                sampleSpectrumTmp[samplesPerFrame - i] = 0.0f;
+                                sampleSpectrum[i] += sampleSpectrum[samplesPerFrame - i];
                             }
 
                             uint8_t curByte = 0;
@@ -414,9 +415,9 @@ struct DataRxTx {
                                 for (int i = 0; i < nDataBitsPerTx; ++i) {
                                     int k = i%8;
                                     int bin = std::round(dataFreqs_hz[i]*ihzPerFrame);
-                                    if (sampleSpectrumTmp[bin] > 1*sampleSpectrumTmp[bin + d0]) {
+                                    if (sampleSpectrum[bin] > 1*sampleSpectrum[bin + d0]) {
                                         curByte += 1 << k;
-                                    } else if (sampleSpectrumTmp[bin + d0] > 1*sampleSpectrumTmp[bin]) {
+                                    } else if (sampleSpectrum[bin + d0] > 1*sampleSpectrum[bin]) {
                                     } else {
                                     }
                                     if (k == 7) {
@@ -431,9 +432,9 @@ struct DataRxTx {
                                     int kmax = 0;
                                     double amax = 0.0;
                                     for (int k = 0; k < 16; ++k) {
-                                        if (sampleSpectrumTmp[bin + k] > amax) {
+                                        if (sampleSpectrum[bin + k] > amax) {
                                             kmax = k;
-                                            amax = sampleSpectrumTmp[bin + k];
+                                            amax = sampleSpectrum[bin + k];
                                         }
                                     }
 
@@ -541,9 +542,7 @@ struct DataRxTx {
     fftwf_complex *fftOut = 0;
 
     ::AmplitudeData sampleAmplitude;
-
     ::SpectrumData sampleSpectrum;
-    ::SpectrumData sampleSpectrumTmp;
 
     std::array<char, ::kMaxDataSize> rxData;
     std::array<std::uint8_t, ::kMaxDataSize> encodedData;
@@ -609,6 +608,8 @@ struct DataRxTx {
 
 int init() {
     if (g_isInitialized) return 0;
+
+    printf("Initializing ...\n");
 
     SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
 
