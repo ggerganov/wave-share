@@ -144,10 +144,12 @@ struct DataRxTx {
             double curHzPerFrame = sampleRateOut/samplesPerFrame;
             double curIHzPerFrame = 1.0/curHzPerFrame;
             for (int i = 0; i < samplesPerFrame; i++) {
-                bit1Amplitude[k][i] = std::sin((2.0*M_PI*i)*freq*isamplesPerFrame*curIHzPerFrame + phaseOffset);
+                double curi = i;
+                bit1Amplitude[k][i] = std::sin((2.0*M_PI)*(curi*isamplesPerFrame)*(freq*curIHzPerFrame) + phaseOffset);
             }
             for (int i = 0; i < samplesPerFrame; i++) {
-                bit0Amplitude[k][i] = std::sin((2.0*M_PI*i)*(freq + hzPerFrame*d0)*isamplesPerFrame*curIHzPerFrame + phaseOffset);
+                double curi = i;
+                bit0Amplitude[k][i] = std::sin((2.0*M_PI)*(curi*isamplesPerFrame)*((freq + hzPerFrame*d0)*curIHzPerFrame) + phaseOffset);
             }
         }
 
@@ -207,10 +209,12 @@ struct DataRxTx {
                     double curHzPerFrame = sampleRateOut/samplesPerFrame;
                     double curIHzPerFrame = 1.0/curHzPerFrame;
                     for (int i = 0; i < samplesPerFrameOut; i++) {
-                        bit1Amplitude[k][i] = std::sin((2.0*M_PI*(i + frameId*samplesPerFrameOut))*freq*isamplesPerFrame*curIHzPerFrame + phaseOffset);
+                        double curi = (i + frameId*samplesPerFrameOut);
+                        bit1Amplitude[k][i] = std::sin((2.0*M_PI)*(curi*isamplesPerFrame)*(freq*curIHzPerFrame) + phaseOffset);
                     }
                     for (int i = 0; i < samplesPerFrameOut; i++) {
-                        bit0Amplitude[k][i] = std::sin((2.0*M_PI*(i + frameId*samplesPerFrameOut))*(freq + hzPerFrame*d0)*isamplesPerFrame*curIHzPerFrame + phaseOffset);
+                        double curi = (i + frameId*samplesPerFrameOut);
+                        bit0Amplitude[k][i] = std::sin((2.0*M_PI)*(curi*isamplesPerFrame)*((freq + hzPerFrame*d0)*curIHzPerFrame) + phaseOffset);
                     }
                 }
             }
@@ -618,7 +622,7 @@ int init() {
         return (1);
     }
 
-    SDL_SetHintWithPriority( SDL_HINT_AUDIO_RESAMPLING_MODE, "medium", SDL_HINT_OVERRIDE );
+    SDL_SetHintWithPriority(SDL_HINT_AUDIO_RESAMPLING_MODE, "medium", SDL_HINT_OVERRIDE);
 
     {
         int devcount = SDL_GetNumAudioDevices(SDL_FALSE);

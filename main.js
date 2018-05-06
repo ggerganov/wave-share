@@ -168,7 +168,7 @@ function getIPs(callback){
     }, 1000);
 }
 
-function transmitRelevantDataSender(sdp) {
+function transmitRelevantData(sdp, dataType) {
     var res = parseSDP(sdp);
     var hashparts = null;
     if (typeof res.fingerprint === 'undefined') {
@@ -178,69 +178,22 @@ function transmitRelevantDataSender(sdp) {
     }
 
     var r = new Uint8Array(256);
-    r[0] = "O".charCodeAt(0);
+    r[0] = dataType.charCodeAt(0);
 
-	var ip = document.getElementById('available-networks').value;
+    var ip = document.getElementById('available-networks').value;
     r[2] = parseInt(ip.split(".")[0]);
     r[3] = parseInt(ip.split(".")[1]);
     r[4] = parseInt(ip.split(".")[2]);
     r[5] = parseInt(ip.split(".")[3]);
 
-	for (var m in res.media[0].candidates) {
-		if (res.media[0].candidates[m].ip != ip) continue;
-		//if (res.media[0].candidate[m].transport != "UDP") continue;
-		var port = res.media[0].candidates[m].port;
-		r[6] = parseInt(port & 0xFF00) >> 8
-		r[7] = parseInt(port & 0x00FF);
-		break;
-	}
-
-    for (var i = 0; i < 32; ++i) {
-        r[8+i] = parseInt(hashparts[i], 16);
+    for (var m in res.media[0].candidates) {
+        if (res.media[0].candidates[m].ip != ip) continue;
+        //if (res.media[0].candidate[m].transport != "UDP") continue;
+        var port = res.media[0].candidates[m].port;
+        r[6] = parseInt(port & 0xFF00) >> 8
+        r[7] = parseInt(port & 0x00FF);
+        break;
     }
-
-    var credentials = "";
-    credentials += res.media[0].iceUfrag;
-    credentials += " ";
-    credentials += res.media[0].icePwd;
-    for (var i = 0; i < credentials.length; ++i) {
-        r[40 + i] = credentials.charCodeAt(i);
-    }
-
-    r[1] = 40 + credentials.length;
-
-    var buffer = Module._malloc(256);
-    Module.writeArrayToMemory(r, buffer, 256);
-    Module.cwrap('setText', 'number', ['number', 'buffer'])(r[1], buffer);
-    Module._free(buffer);
-}
-
-function transmitRelevantDataReceiver(sdp) {
-    var res = parseSDP(sdp);
-    var hashparts = null;
-    if (typeof res.fingerprint === 'undefined') {
-        hashparts = res.media[0].fingerprint.hash.split(":");
-    } else {
-        hashparts = res.fingerprint.hash.split(":");
-    }
-
-    var r = new Uint8Array(256);
-    r[0] = "A".charCodeAt(0);
-
-	var ip = document.getElementById('available-networks').value;
-    r[2] = parseInt(ip.split(".")[0]);
-    r[3] = parseInt(ip.split(".")[1]);
-    r[4] = parseInt(ip.split(".")[2]);
-    r[5] = parseInt(ip.split(".")[3]);
-
-	for (var m in res.media[0].candidates) {
-		if (res.media[0].candidates[m].ip != ip) continue;
-		//if (res.media[0].candidate[m].transport != "UDP") continue;
-		var port = res.media[0].candidates[m].port;
-		r[6] = parseInt(port & 0xFF00) >> 8
-		r[7] = parseInt(port & 0x00FF);
-		break;
-	}
 
     for (var i = 0; i < 32; ++i) {
         r[8+i] = parseInt(hashparts[i], 16);
@@ -341,7 +294,8 @@ function senderInit() {
 
     senderPC.onicecandidate = function(e) {
         if (e.candidate) return;
-        transmitRelevantDataSender(senderPC.localDescription.sdp);
+        // send offer using sound
+        transmitRelevantData(senderPC.localDescription.sdp, "O");
     }
 
     createOfferSDP();
@@ -392,6 +346,38 @@ function updatePeerInfo() {
     }
 }
 
+function parseRxData(brx) {
+    var vals = Array();
+    vals[0] = "";
+    vals[0] += String(brx[2]) + ".";
+    vals[0] += String(brx[3]) + ".";
+    vals[0] += String(brx[4]) + ".";
+    vals[0] += String(brx[5]);
+
+    vals[1] = String(brx[6]*256 + brx[7]);
+
+    vals[2] = "";
+    for (var i = 0; i < 32; ++i) {
+        if (brx[8+i] == 0) {
+            vals[2] += '00';
+        } else if (brx[8+i] < 16) {
+            vals[2] += '0'+brx[8+i].toString(16).toUpperCase();
+        } else {
+            vals[2] += brx[8+i].toString(16).toUpperCase();
+        }
+        if (i < 31) vals[2] += ':';
+    }
+
+    var credentials = "";
+    for (var i = 40; i < brx[1]; ++i) {
+        credentials += String.fromCharCode(brx[i]);
+    }
+    vals[3] = credentials.split(" ")[0];
+    vals[4] = credentials.split(" ")[1];
+
+    return vals;
+}
+
 function checkRxForPeerData() {
     if (typeof Module === 'undefined') return;
     Module.cwrap('getText', 'number', ['buffer'])(bufferRx);
@@ -408,34 +394,7 @@ function checkRxForPeerData() {
         console.log("Received Offer");
         lastSenderRequest = lastSenderRequestTmp;
 
-        var vals = Array();
-        vals[0] = "";
-        vals[0] += String(brx[2]) + ".";
-        vals[0] += String(brx[3]) + ".";
-        vals[0] += String(brx[4]) + ".";
-        vals[0] += String(brx[5]);
-
-        vals[1] = String(brx[6]*256 + brx[7]);
-
-        vals[2] = "";
-        for (var i = 0; i < 32; ++i) {
-            if (brx[8+i] == 0) {
-                vals[2] += '00';
-            } else if (brx[8+i] < 16) {
-                vals[2] += '0'+brx[8+i].toString(16).toUpperCase();
-            } else {
-                vals[2] += brx[8+i].toString(16).toUpperCase();
-            }
-            if (i < 31) vals[2] += ':';
-        }
-
-        var credentials = "";
-        for (var i = 40; i < brx[1]; ++i) {
-            credentials += String.fromCharCode(brx[i]);
-        }
-        vals[3] = credentials.split(" ")[0];
-        vals[4] = credentials.split(" ")[1];
-
+        var vals = parseRxData(brx);
         var res = parseSDP(getOfferTemplate());
 
         res.origin.username             = kOfferUsername;
@@ -481,34 +440,7 @@ function checkRxForPeerData() {
         console.log("Received Answer");
         lastReceiverAnswer = lastReceiverAnswerTmp;
 
-        var vals = Array();
-        vals[0] = "";
-        vals[0] += String(brx[2]) + ".";
-        vals[0] += String(brx[3]) + ".";
-        vals[0] += String(brx[4]) + ".";
-        vals[0] += String(brx[5]);
-
-        vals[1] = String(brx[6]*256 + brx[7]);
-
-        vals[2] = "";
-        for (var i = 0; i < 32; ++i) {
-            if (brx[8+i] == 0) {
-                vals[2] += '00';
-            } else if (brx[8+i] < 16) {
-                vals[2] += '0'+brx[8+i].toString(16).toUpperCase();
-            } else {
-                vals[2] += brx[8+i].toString(16).toUpperCase();
-            }
-            if (i < 31) vals[2] += ':';
-        }
-
-        var credentials = "";
-        for (var i = 40; i < brx[1]; ++i) {
-            credentials += String.fromCharCode(brx[i]);
-        }
-        vals[3] = credentials.split(" ")[0];
-        vals[4] = credentials.split(" ")[1];
-
+        var vals = parseRxData(brx);
         var res = parseSDP(getAnswerTemplate());
 
         res.origin.username             = kAnswerUsername;
@@ -539,8 +471,12 @@ function checkRxForPeerData() {
         lastReceiverAnswerSDP = '{"type":"answer","sdp":'+JSON.stringify(writeSDP(res))+'}';
         playSound("/media/open-ended");
 
-        peerInfo.innerHTML= "Trying to connect with " + vals[0] + " ...";
-        senderSend();
+        if (senderPC) {
+            peerInfo.innerHTML= "Trying to connect with " + vals[0] + " ...";
+            senderSend();
+        } else {
+            peerInfo.innerHTML= "Received answer not meant for us (" + vals[0] + ")";
+        }
 
         return;
     } else {
@@ -562,7 +498,7 @@ function createAnswerSDP() {
                     res.origin.sessionId        = kAnswerSessionId;
                     res.origin.sessionVersion   = kAnswerSessionVersion;
                     res.media[0].mid            = kAnswerBundle;
-					res.media[0].connection.ip  = document.getElementById('available-networks').value;
+                    res.media[0].connection.ip  = document.getElementById('available-networks').value;
 
                     e.sdp = writeSDP(res);
                     receiverPC.setLocalDescription(e);
@@ -581,7 +517,8 @@ function receiverInit() {
     receiverPC.ondatachannel = receiveChannelCallback;
     receiverPC.onicecandidate = function(e) {
         if (e.candidate) return;
-        transmitRelevantDataReceiver(receiverPC.localDescription.sdp);
+        // send answer using sound
+        transmitRelevantData(receiverPC.localDescription.sdp, "A");
     };
     receiverPC.oniceconnectionstatechange = function(e) {};
 
