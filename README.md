@@ -71,5 +71,5 @@ To build this project you need Emscripten compiler. Additionally, you need [FFTW
   - Ultrasonic sound transmission does not work on most devices. Probably hardware limitations?
   - In presence of multiple local networks, cannot currently select which one to use. Always the first one is used
   - There is occasionally sound cracking during transmission. Need to optimize the Tx code
-  - The size of the emscripten generated .js is too big (~4MB). Rewrite in pure JS?
+  - The size of the emscripten generated .js is too big (~1MB). Rewrite in pure JS?
   - On mobile, using Firefox, the page can remain running in the background even after closing the tab
