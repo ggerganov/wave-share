@@ -112,15 +112,8 @@ function getIPs(callback){
         useWebKit = !!win.webkitRTCPeerConnection;
     }
 
-    //minimal requirements for data connection
-    var mediaConstraints = {
-        optional: [{RtpDataChannels: true}]
-    };
-
-    var servers = {iceServers: [{urls: "stun:stun.services.mozilla.com"}]};
-
     //construct a new RTCPeerConnection
-    var pc = new RTCPeerConnection(servers, mediaConstraints);
+    var pc = new RTCPeerConnection(null);
 
     function handleCandidate(candidate){
         //match just the IP address
@@ -289,7 +282,7 @@ function senderInit() {
     senderPC = new RTCPeerConnection(null);
 
     senderPC.oniceconnectionstatechange = function(e) {
-        var state = senderPC.iceConnectionState;
+        //var state = senderPC.iceConnectionState;
     };
 
     senderPC.onicecandidate = function(e) {

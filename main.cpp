@@ -782,7 +782,7 @@ int init() {
         devid_in = 0;
     } else {
 
-        printf("Obtained spec for input device (SDL Id = %d):\n", devid_out);
+        printf("Obtained spec for input device (SDL Id = %d):\n", devid_in);
         printf("    - Sample rate:       %d\n", captureSpec.freq);
         printf("    - Format:            %d (required: %d)\n", captureSpec.format, desiredSpec.format);
         printf("    - Channels:          %d (required: %d)\n", captureSpec.channels, desiredSpec.channels);
