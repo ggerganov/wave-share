@@ -61,13 +61,17 @@ The current approach uses a multi-frequency [Frequency-Shift Keying (FSK)](https
 
 For all protocols: `dF = 46.875 Hz`. For non-ultrasonic protocols: `F0 = 1875.000 Hz`. For ultrasonic protocols: `F0 = 15000.000 Hz`.
 
+## Getting the local IP address
+
+For convenience, a [simple WebRTC hack](https://github.com/diafygi/webrtc-ips) is used to automatically detect the local IP address of your machine, so you don't have to provide it manually. However, the latest WebRTC spec prevents this from being possible for security reasons, so at some point this "feature" will stop working in all browsers. For example, [it no longer works on Safari](https://stackoverflow.com/questions/46925857/get-the-client-ip-address-with-javascript-on-safari).
+
 ## Build
 
 To build this project you need Emscripten compiler. Additionally, you need [FFTW](http://www.fftw.org) built with Emscripten. Run the ``compile.sh`` script.
 
 ## Known problems / stuff to improve
 
-  - Does not work with: IE, IE Edge, Chrome/Firefox on iOS, Safari on macOS (?)
+  - Does not work with: IE, IE Edge, Chrome/Firefox on iOS, Safari on macOS
   - Ultrasonic sound transmission does not work on most devices. Probably hardware limitations?
   - In presence of multiple local networks, cannot currently select which one to use. Always the first one is used
   - There is occasionally sound cracking during transmission. Need to optimize the Tx code
