@@ -73,6 +73,8 @@ You will need an Emscripten compiler. Additionally, you need [FFTW](http://www.f
 
 ### CLI tool `wave-share`
 
+This is a simple tool that receives and sends data using the explained `wave-share` sound tx/rx protocol. Type some text on the standard input and press Enter to transmit.
+
 ```bash
 # build
 git clone https://github.com/ggerganov/wave-share
@@ -84,7 +86,9 @@ make
 ./wave-share
 ```
 
-This is a simple tool that receives and sends data using the `wave-share` protocol. Type some text on the standard input and press Enter to transmit.
+Here is a short demo:
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=TcfjCMCyqF0" target="_blank"><img src="http://img.youtube.com/vi/TcfjCMCyqF0/0.jpg" alt="Wave-share: command line tool" width="360" height="270" border="10" /></a>
 
 ## Known problems / stuff to improve
 
