@@ -1,0 +1,7 @@
+build
+build_timestamp.h
+compile_*
+fftw-3.3.3
+*.js
+*.wasm
+lib
