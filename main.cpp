@@ -3,8 +3,6 @@
  *  \author Georgi Gerganov
  */
 
-#include "build_timestamp.h"
-
 #include "fftw3.h"
 #include "reed-solomon/rs.hpp"
 
@@ -18,13 +16,18 @@
 #include <chrono>
 #include <ctime>
 #include <algorithm>
+#include <map>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
 
 #ifdef __EMSCRIPTEN__
+#include "build_timestamp.h"
 #include "emscripten/emscripten.h"
+#else
+#include <thread>
+#include <iostream>
 #endif
 
 #ifdef main
@@ -32,6 +35,8 @@
 #endif
 
 static char *g_captureDeviceName = nullptr;
+static int g_captureId = -1;
+static int g_playbackId = -1;
 
 static bool g_isInitialized = false;
 static int g_totalBytesCaptured = 0;
@@ -129,7 +134,7 @@ struct DataRxTx {
         framesToRecord = 0;
         framesLeftToRecord = 0;
         nBitsInMarker = 16;
-        nMarkerFrames = 64;
+        nMarkerFrames = 8;
         nPostMarkerFrames = 0;
         sendDataLength = (txMode == ::TxMode::FixedLength) ? ::kDefaultFixedLength : textLength + 3;
 
@@ -518,12 +523,13 @@ struct DataRxTx {
                             int decodedLength = rxData[0];
                             if (rsData->Decode(encodedData.data() + encodedOffset, rxData.data()) == 0) {
                                 printf("Decoded length = %d\n", decodedLength);
-                                if (rxData[0] == 'A') {
+                                if (txMode == ::TxMode::FixedLength && rxData[0] == 'A') {
                                     printf("[ANSWER] Received sound data successfully!\n");
-                                } else if (rxData[0] == 'O') {
+                                } else if (txMode == ::TxMode::FixedLength && rxData[0] == 'O') {
                                     printf("[OFFER]  Received sound data successfully!\n");
                                 } else {
-                                    printf("Received sound data succssfully\n");
+                                    std::string s((char *) rxData.data(), decodedLength);
+                                    printf("Received sound data successfully: '%s'\n", s.c_str());
                                 }
                                 framesToRecord = 0;
                                 isValid = true;
@@ -719,15 +725,17 @@ int init() {
     SDL_SetHintWithPriority(SDL_HINT_AUDIO_RESAMPLING_MODE, "medium", SDL_HINT_OVERRIDE);
 
     {
-        int devcount = SDL_GetNumAudioDevices(SDL_FALSE);
-        for (int i = 0; i < devcount; i++) {
-            printf("Output  device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
+        int nDevices = SDL_GetNumAudioDevices(SDL_FALSE);
+        printf("Found %d playback devices:\n", nDevices);
+        for (int i = 0; i < nDevices; i++) {
+            printf("    - Playback device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
         }
     }
     {
-        int devcount = SDL_GetNumAudioDevices(SDL_TRUE);
-        for (int i = 0; i < devcount; i++) {
-            printf("Capture device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
+        int nDevices = SDL_GetNumAudioDevices(SDL_TRUE);
+        printf("Found %d capture devices:\n", nDevices);
+        for (int i = 0; i < nDevices; i++) {
+            printf("    - Capture device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
         }
     }
 
@@ -743,14 +751,18 @@ int init() {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    //devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE);
-    //devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
-    devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, 0);
+    if (g_playbackId >= 0) {
+        printf("Attempt to open playback device %d : '%s' ...\n", g_playbackId, SDL_GetAudioDeviceName(g_playbackId, SDL_FALSE));
+        devid_out = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(g_playbackId, SDL_FALSE), SDL_FALSE, &desiredSpec, &obtainedSpec, 0);
+    } else {
+        printf("Attempt to open default playback device ...\n");
+        devid_out = SDL_OpenAudioDevice(NULL, SDL_FALSE, &desiredSpec, &obtainedSpec, 0);
+    }
+
     if (!devid_out) {
         printf("Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         devid_out = 0;
     } else {
-
         printf("Obtained spec for output device (SDL Id = %d):\n", devid_out);
         printf("    - Sample rate:       %d (required: %d)\n", obtainedSpec.freq, desiredSpec.freq);
         printf("    - Format:            %d (required: %d)\n", obtainedSpec.format, desiredSpec.format);
@@ -771,12 +783,13 @@ int init() {
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.samples = 1024;
 
-    printf("Opening capture device %s%s%s...\n",
-            g_captureDeviceName ? "'" : "",
-            g_captureDeviceName ? g_captureDeviceName : "[[default]]",
-            g_captureDeviceName ? "'" : "");
-
-    devid_in = SDL_OpenAudioDevice(g_captureDeviceName, SDL_TRUE, &captureSpec, &captureSpec, 0);
+    if (g_playbackId >= 0) {
+        printf("Attempt to open capture device %d : '%s' ...\n", g_captureId, SDL_GetAudioDeviceName(g_captureId, SDL_FALSE));
+        devid_in = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(g_captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &captureSpec, 0);
+    } else {
+        printf("Attempt to open default capture device ...\n");
+        devid_in = SDL_OpenAudioDevice(g_captureDeviceName, SDL_TRUE, &captureSpec, &captureSpec, 0);
+    }
     if (!devid_in) {
         printf("Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         devid_in = 0;
@@ -903,19 +916,99 @@ void update() {
     }
 }
 
-int main(int /*argc*/, char** argv) {
+static std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
+    int last = argc;
+    std::map<std::string, std::string> res;
+    for (int i = 1; i < last; ++i) {
+        if (argv[i][0] == '-') {
+            if (strlen(argv[i]) > 1) {
+                res[std::string(1, argv[i][1])] = strlen(argv[i]) > 2 ? argv[i] + 2 : "";
+            }
+        }
+    }
+
+    return res;
+}
+
+int main(int argc, char** argv) {
+#ifdef __EMSCRIPTEN__
     printf("Build time: %s\n", BUILD_TIMESTAMP);
     printf("Press the Init button to start\n");
 
     g_captureDeviceName = argv[1];
+#else
+    printf("Usage: %s [-cN] [-pN] [-tN]\n", argv[0]);
+    printf("    -cN - select capture device N\n");
+    printf("    -pN - select playback device N\n");
+    printf("    -tN - transmission protocol:\n");
+    printf("          -t0 : Normal\n");
+    printf("          -t1 : Fast (default)\n");
+    printf("          -t2 : Fastest\n");
+    printf("          -t3 : Ultrasonic\n");
+    printf("\n");
+
+    g_captureDeviceName = nullptr;
+
+    auto argm = parseCmdArguments(argc, argv);
+    g_captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    g_playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
+    int txProtocol = argm["t"].empty() ? 1 : std::stoi(argm["t"]);
+#endif
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(update, 60, 1);
 #else
-    while(true) {
-        SDL_Delay(20);
+    init();
+    setTxMode(1);
+    printf("Selecting Tx protocol %d\n", txProtocol);
+    switch (txProtocol) {
+        case 0:
+            {
+                printf("Using 'Normal' Tx Protocol\n");
+                setParameters(1, 40, 9, 3, 0, 50);
+            }
+            break;
+        case 1:
+            {
+                printf("Using 'Fast' Tx Protocol\n");
+                setParameters(1, 40, 6, 3, 0, 50);
+            }
+            break;
+        case 2:
+            {
+                printf("Using 'Fastest' Tx Protocol\n");
+                setParameters(1, 40, 3, 3, 0, 50);
+            }
+            break;
+        case 3:
+            {
+                printf("Using 'Ultrasonic' Tx Protocol\n");
+                setParameters(1, 320, 9, 3, 0, 50);
+            }
+            break;
+        default:
+            {
+                printf("Using 'Fast' Tx Protocol\n");
+                setParameters(1, 40, 6, 3, 0, 50);
+            }
+    };
+    printf("\n");
+    std::thread inputThread([]() {
+        while (true) {
+            std::string input;
+            std::cout << "Enter text: ";
+            getline(std::cin, input);
+            setText(input.size(), input.data());
+            std::cout << "Sending ... " << std::endl;
+        }
+    });
+
+    while (true) {
+        SDL_Delay(1);
         update();
     }
+
+    inputThread.join();
 #endif
 
     delete g_data;
