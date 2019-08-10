@@ -134,7 +134,7 @@ struct DataRxTx {
         framesToRecord = 0;
         framesLeftToRecord = 0;
         nBitsInMarker = 16;
-        nMarkerFrames = 8;
+        nMarkerFrames = 16;
         nPostMarkerFrames = 0;
         sendDataLength = (txMode == ::TxMode::FixedLength) ? ::kDefaultFixedLength : textLength + 3;
 
