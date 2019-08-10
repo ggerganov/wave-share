@@ -67,7 +67,24 @@ For convenience, a [simple WebRTC hack](https://github.com/diafygi/webrtc-ips) i
 
 ## Build
 
-To build this project you need Emscripten compiler. Additionally, you need [FFTW](http://www.fftw.org) built with Emscripten. Run the ``compile.sh`` script.
+### Web Assembly module `wave.wasm`
+
+You will need an Emscripten compiler. Additionally, you need [FFTW](http://www.fftw.org) built with Emscripten. Run the ``compile.sh`` script.
+
+### CLI tool `wave-share`
+
+```bash
+# build
+git clone https://github.com/ggerganov/wave-share
+cd wave-share && mkdir build && cd build
+cmake ..
+make
+
+# running
+./wave-share
+```
+
+This is a simple tool that receives and sends data using the `wave-share` protocol. Type some text on the standard input and press Enter to transmit.
 
 ## Known problems / stuff to improve
 
