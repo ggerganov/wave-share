@@ -29,4 +29,4 @@ string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
 add_executable(wave-share main.cpp)
 target_include_directories(wave-share PUBLIC ${FFTW_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
-target_link_libraries(wave-share PUBLIC ${FFTW_LIBRARIES} ${SDL2_LIBRARIES})
+target_link_libraries(wave-share PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${FFTW_LIBRARIES} ${SDL2_LIBRARIES})
