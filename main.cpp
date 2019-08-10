@@ -994,12 +994,19 @@ int main(int argc, char** argv) {
     };
     printf("\n");
     std::thread inputThread([]() {
+        std::string inputOld = "";
         while (true) {
             std::string input;
             std::cout << "Enter text: ";
             getline(std::cin, input);
+            if (input.empty()) {
+                std::cout << "Re-sending ... " << std::endl;
+                input = inputOld;
+            } else {
+                std::cout << "Sending ... " << std::endl;
+            }
             setText(input.size(), input.data());
-            std::cout << "Sending ... " << std::endl;
+            inputOld = input;
         }
     });
 
