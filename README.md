@@ -86,7 +86,7 @@ make
 ./wave-share
 ```
 
-Here is a short demo:
+Here is a short video demonstrating how to use the CLI tool:
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=TcfjCMCyqF0" target="_blank"><img src="http://img.youtube.com/vi/TcfjCMCyqF0/0.jpg" alt="Wave-share: command line tool" width="360" height="270" border="10" /></a>
 
