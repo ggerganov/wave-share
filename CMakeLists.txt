@@ -13,7 +13,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -W -Wall -Wno-long-long -peda
 #
 ## Dependencies
 find_package(Threads REQUIRED)
-find_package(FFTW REQUIRED)
 find_package(SDL2)
 
 if (NOT USE_FINDSDL2 AND NOT SDL2_FOUND)
@@ -28,5 +27,5 @@ endif()
 string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
 add_executable(wave-share main.cpp)
-target_include_directories(wave-share PUBLIC ${FFTW_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
-target_link_libraries(wave-share PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${FFTW_LIBRARIES} ${SDL2_LIBRARIES})
+target_include_directories(wave-share PUBLIC ${SDL2_INCLUDE_DIRS})
+target_link_libraries(wave-share PUBLIC ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARIES})

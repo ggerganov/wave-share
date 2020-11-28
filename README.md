@@ -69,7 +69,7 @@ For convenience, a [simple WebRTC hack](https://github.com/diafygi/webrtc-ips) i
 
 ### Web Assembly module `wave.wasm`
 
-You will need an Emscripten compiler. Additionally, you need [FFTW](http://www.fftw.org) built with Emscripten. Run the ``compile.sh`` script.
+You will need an Emscripten compiler. Run the ``compile.sh`` script.
 
 ### CLI tool `wave-share`
 

@@ -3,7 +3,6 @@
  *  \author Georgi Gerganov
  */
 
-#include "fftw3.h"
 #include "reed-solomon/rs.hpp"
 
 #include <SDL2/SDL.h>
@@ -17,6 +16,7 @@
 #include <ctime>
 #include <algorithm>
 #include <map>
+#include <complex>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -48,55 +48,124 @@ struct DataRxTx;
 static DataRxTx *g_data = nullptr;
 
 namespace {
-    //constexpr float IRAND_MAX = 1.0f/RAND_MAX;
-    //inline float frand() { return ((float)(rand()%RAND_MAX)*IRAND_MAX); }
 
-    constexpr double kBaseSampleRate = 48000.0;
-    constexpr auto kMaxSamplesPerFrame = 1024;
-    constexpr auto kMaxDataBits = 256;
-    constexpr auto kMaxDataSize = 256;
-    constexpr auto kMaxLength = 140;
-    constexpr auto kMaxSpectrumHistory = 4;
-    constexpr auto kMaxRecordedFrames = 64*10;
-    constexpr auto kDefaultFixedLength = 82;
+constexpr double kBaseSampleRate = 48000.0;
+constexpr auto kMaxSamplesPerFrame = 1024;
+constexpr auto kMaxDataBits = 256;
+constexpr auto kMaxDataSize = 256;
+constexpr auto kMaxLength = 140;
+constexpr auto kMaxSpectrumHistory = 4;
+constexpr auto kMaxRecordedFrames = 64*10;
+constexpr auto kDefaultFixedLength = 82;
 
-    enum TxMode {
-        FixedLength = 0,
-        VariableLength,
-    };
+// FFT routines taken from https://stackoverflow.com/a/37729648/4039976
 
-    using AmplitudeData   = std::array<float, kMaxSamplesPerFrame>;
-    using AmplitudeData16 = std::array<int16_t, kMaxRecordedFrames*kMaxSamplesPerFrame>;
-    using SpectrumData    = std::array<float, kMaxSamplesPerFrame>;
-    using RecordedData    = std::array<float, kMaxRecordedFrames*kMaxSamplesPerFrame>;
+int log2(int N) {
+    int k = N, i = 0;
+    while(k) {
+        k >>= 1;
+        i++;
+    }
+    return i - 1;
+}
 
-    inline void addAmplitudeSmooth(const AmplitudeData & src, AmplitudeData & dst, float scalar, int startId, int finalId, int cycleMod, int nPerCycle) {
-        int nTotal = nPerCycle*finalId;
-        float frac = 0.15f;
-        float ds = frac*nTotal;
-        float ids = 1.0f/ds;
-        int nBegin = frac*nTotal;
-        int nEnd = (1.0f - frac)*nTotal;
-        for (int i = startId; i < finalId; i++) {
-            float k = cycleMod*finalId + i;
-            if (k < nBegin) {
-                dst[i] += scalar*src[i]*(k*ids);
-            } else if (k > nEnd) {
-                dst[i] += scalar*src[i]*(((float)(nTotal) - k)*ids);
-            } else {
-                dst[i] += scalar*src[i];
+int check(int n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+int reverse(int N, int n) {
+    int j, p = 0;
+    for(j = 1; j <= log2(N); j++) {
+        if(n & (1 << (log2(N) - j)))
+            p |= 1 << (j - 1);
+    }
+    return p;
+}
+
+void ordina(std::complex<float>* f1, int N) {
+    std::complex<float> f2[kMaxSamplesPerFrame];
+    for(int i = 0; i < N; i++)
+        f2[i] = f1[reverse(N, i)];
+    for(int j = 0; j < N; j++)
+        f1[j] = f2[j];
+}
+
+void transform(std::complex<float>* f, int N) {
+    ordina(f, N);    //first: reverse order
+    std::complex<float> *W;
+    W = (std::complex<float> *)malloc(N / 2 * sizeof(std::complex<float>));
+    W[1] = std::polar(1., -2. * M_PI / N);
+    W[0] = 1;
+    for(int i = 2; i < N / 2; i++)
+        W[i] = pow(W[1], i);
+    int n = 1;
+    int a = N / 2;
+    for(int j = 0; j < log2(N); j++) {
+        for(int i = 0; i < N; i++) {
+            if(!(i & n)) {
+                std::complex<float> temp = f[i];
+                std::complex<float> Temp = W[(i * a) % (n * a)] * f[i + n];
+                f[i] = temp + Temp;
+                f[i + n] = temp - Temp;
             }
         }
+        n *= 2;
+        a = a / 2;
     }
+    free(W);
+}
 
-    template <class T>
-        float getTime_ms(const T & tStart, const T & tEnd) {
-            return ((float)(std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count()))/1000.0;
+void FFT(std::complex<float>* f, int N, float d) {
+    transform(f, N);
+    for(int i = 0; i < N; i++)
+        f[i] *= d; //multiplying by step
+}
+
+void FFT(float * src, std::complex<float>* dst, int N, float d) {
+    for (int i = 0; i < N; ++i) {
+        dst[i].real(src[i]);
+        dst[i].imag(0);
+    }
+    FFT(dst, N, d);
+}
+
+enum TxMode {
+    FixedLength = 0,
+    VariableLength,
+};
+
+using AmplitudeData   = std::array<float, kMaxSamplesPerFrame>;
+using AmplitudeData16 = std::array<int16_t, kMaxRecordedFrames*kMaxSamplesPerFrame>;
+using SpectrumData    = std::array<float, kMaxSamplesPerFrame>;
+using RecordedData    = std::array<float, kMaxRecordedFrames*kMaxSamplesPerFrame>;
+
+inline void addAmplitudeSmooth(const AmplitudeData & src, AmplitudeData & dst, float scalar, int startId, int finalId, int cycleMod, int nPerCycle) {
+    int nTotal = nPerCycle*finalId;
+    float frac = 0.15f;
+    float ds = frac*nTotal;
+    float ids = 1.0f/ds;
+    int nBegin = frac*nTotal;
+    int nEnd = (1.0f - frac)*nTotal;
+    for (int i = startId; i < finalId; i++) {
+        float k = cycleMod*finalId + i;
+        if (k < nBegin) {
+            dst[i] += scalar*src[i]*(k*ids);
+        } else if (k > nEnd) {
+            dst[i] += scalar*src[i]*(((float)(nTotal) - k)*ids);
+        } else {
+            dst[i] += scalar*src[i];
         }
-
-    int getECCBytesForLength(int len) {
-        return std::max(4, 2*(len/5));
     }
+}
+
+template <class T>
+float getTime_ms(const T & tStart, const T & tEnd) {
+    return ((float)(std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count()))/1000.0;
+}
+
+int getECCBytesForLength(int len) {
+    return std::max(4, 2*(len/5));
+}
 }
 
 struct DataRxTx {
@@ -213,17 +282,9 @@ struct DataRxTx {
 
         rxData.fill(0);
 
-        if (fftPlan) fftwf_destroy_plan(fftPlan);
-        if (fftIn) fftwf_free(fftIn);
-        if (fftOut) fftwf_free(fftOut);
-
-        fftIn = (float*) fftwf_malloc(sizeof(float)*samplesPerFrame);
-        fftOut = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex)*samplesPerFrame);
-        fftPlan = fftwf_plan_dft_r2c_1d(1*samplesPerFrame, fftIn, fftOut, FFTW_ESTIMATE);
-
         for (int i = 0; i < samplesPerFrame; ++i) {
-            fftOut[i][0] = 0.0f;
-            fftOut[i][1] = 0.0f;
+            fftOut[i].real(0.0f);
+            fftOut[i].imag(0.0f);
         }
     }
 
@@ -391,13 +452,13 @@ struct DataRxTx {
                         }
 
                         // calculate spectrum
-                        std::copy(sampleAmplitudeAverage.begin(), sampleAmplitudeAverage.begin() + samplesPerFrame, fftIn);
+                        std::copy(sampleAmplitudeAverage.begin(), sampleAmplitudeAverage.begin() + samplesPerFrame, fftIn.data());
 
-                        fftwf_execute(fftPlan);
+                        FFT(fftIn.data(), fftOut.data(), samplesPerFrame, 1.0);
 
                         double fsum = 0.0;
                         for (int i = 0; i < samplesPerFrame; ++i) {
-                            sampleSpectrum[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
+                            sampleSpectrum[i] = (fftOut[i].real()*fftOut[i].real() + fftOut[i].imag()*fftOut[i].imag());
                             fsum += sampleSpectrum[i];
                         }
                         for (int i = 1; i < samplesPerFrame/2; ++i) {
@@ -448,7 +509,7 @@ struct DataRxTx {
 
                             std::copy(
                                 recordedAmplitude.begin() + offsetTx*step,
-                                recordedAmplitude.begin() + offsetTx*step + samplesPerFrame, fftIn);
+                                recordedAmplitude.begin() + offsetTx*step + samplesPerFrame, fftIn.data());
 
                             for (int k = 1; k < framesPerTx-1; ++k) {
                                 for (int i = 0; i < samplesPerFrame; ++i) {
@@ -456,10 +517,10 @@ struct DataRxTx {
                                 }
                             }
 
-                            fftwf_execute(fftPlan);
+                            FFT(fftIn.data(), fftOut.data(), samplesPerFrame, 1.0);
 
                             for (int i = 0; i < samplesPerFrame; ++i) {
-                                sampleSpectrum[i] = (fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1]);
+                                sampleSpectrum[i] = (fftOut[i].real()*fftOut[i].real() + fftOut[i].imag()*fftOut[i].imag());
                             }
                             for (int i = 1; i < samplesPerFrame/2; ++i) {
                                 sampleSpectrum[i] += sampleSpectrum[samplesPerFrame - i];
@@ -638,9 +699,8 @@ struct DataRxTx {
     bool receivingData;
     bool analyzingData;
 
-    fftwf_plan fftPlan = 0;
-    float *fftIn;
-    fftwf_complex *fftOut = 0;
+    std::array<float, kMaxSamplesPerFrame> fftIn;
+    std::array<std::complex<float>, kMaxSamplesPerFrame> fftOut;
 
     ::AmplitudeData sampleAmplitude;
     ::SpectrumData sampleSpectrum;
