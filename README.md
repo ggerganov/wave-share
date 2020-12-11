@@ -77,6 +77,12 @@ You will need an Emscripten compiler. Run the ``compile.sh`` script.
 
 ### CLI tool `wave-share`
 
+---
+
+**Important:** This CLI tool was the prototype for the now standalone library [ggwave](https://github.com/ggerganov/ggwave). Make sure to check it out, as it has more up-to-date examples for the application of this data-over-sound type of communication.
+
+---
+
 This is a simple tool that receives and sends data using the explained `wave-share` sound tx/rx protocol. Type some text on the standard input and press Enter to transmit.
 
 ```bash
